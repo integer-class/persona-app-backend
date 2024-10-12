@@ -1,0 +1,20 @@
+# Django framework
+django
+
+# WSGI HTTP Server for UNIX
+gunicorn
+
+# Django REST framework
+djangorestframework
+
+# PostgreSQL database adapter for Python
+psycopg2-binary
+
+# Python Imaging Library
+Pillow
+
+# PyTorch for model inference
+torch
+
+# Torchvision for image transformations
+torchvision
