@@ -1,6 +1,6 @@
 from django.urls import path, include 
 from rest_framework.routers import DefaultRouter
-from .views import Face_shapeViewSet, Hair_stylesViewSet, AccessoriesViewSet, RecommendationsViewSet, Recommendations_hair_stylesViewSet, Recommendations_accessoriesViewSet, FeedbackViewSet, HistoryViewSet
+from .views import Face_shapeViewSet, Hair_stylesViewSet, AccessoriesViewSet, RecommendationsViewSet, Recommendations_hair_stylesViewSet, Recommendations_accessoriesViewSet, FeedbackViewSet, HistoryViewSet, CustomAuthToken, RegisterView
 
 router = DefaultRouter()
 router.register(r'face_shape', Face_shapeViewSet)
@@ -12,7 +12,9 @@ router.register(r'recommendations_accessories', Recommendations_accessoriesViewS
 router.register(r'feedback', FeedbackViewSet)
 router.register(r'history', HistoryViewSet)
 
-urlpatterns = [
+urlpatterns = [        
     path('', include(router.urls)),
+    path('auth/', CustomAuthToken.as_view(), name='auth'),   
+    path('register/', RegisterView.as_view(), name='register'),
 ]
 
