@@ -45,7 +45,6 @@ INSTALLED_APPS = [
     
     # Apps
     'api',
-    'face_shape_app',
 ]
 
 REST_FRAMEWORK = {
@@ -94,11 +93,11 @@ WSGI_APPLICATION = 'config.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('DB_NAME'),
-        'USER': os.getenv('DB_USER'),
-        'PASSWORD': os.getenv('DB_PASSWORD'),
-        'HOST': os.getenv('DB_HOST'),
-        'PORT': os.getenv('DB_PORT'),
+        'NAME': os.getenv('DB_NAME', 'pbl'),
+        'USER': os.getenv('DB_USER', 'bismillah'),
+        'PASSWORD': os.getenv('DB_PASSWORD', 'bismillah'),
+        'HOST': os.getenv('DB_HOST', 'localhost'),
+        'PORT': os.getenv('DB_PORT', '5432'),
     }
 }
 
@@ -138,6 +137,10 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
 STATIC_URL = 'static/'
+
+# Media files (User uploaded files)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field

@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+from .utils import PathAndRename
 
 GENDER_CHOICES = [
     ('male', 'Male'),
@@ -12,6 +13,13 @@ class TimeStampedModel(models.Model):
 
     class Meta:
         abstract = True
+
+class UserProfile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    avatar = models.ImageField(upload_to=PathAndRename('avatars/'), blank=True, null=True, default='avatars/default_avatar.png')
+
+    def __str__(self):
+        return self.user.username
 
 class FaceShape(TimeStampedModel):
     name = models.CharField(max_length=50, unique=True)
@@ -76,6 +84,7 @@ class Feedback(TimeStampedModel):
 class History(TimeStampedModel):
     recommendation = models.ForeignKey(Recommendation, on_delete=models.CASCADE, related_name='history')
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='history')
+    image = models.ImageField(upload_to=PathAndRename('uploads/'), blank=True, null=True)
 
     def __str__(self):
         return f"History of {self.user.username} - {self.recommendation}"

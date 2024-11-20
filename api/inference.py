@@ -12,7 +12,7 @@ model.classifier = torch.nn.Sequential(
 )
 
 # Load the model state dictionary
-model.load_state_dict(torch.load('face_shape_app/model/best_model.pth', map_location=torch.device('cpu'), weights_only=True))
+model.load_state_dict(torch.load('api/model/best_model.pth', map_location=torch.device('cpu'), weights_only=True))
 model.eval()
 
 # Define the image transformations
