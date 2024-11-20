@@ -1,14 +1,12 @@
 from django.urls import path, include 
 from rest_framework.routers import DefaultRouter
-from .views import Face_shapeViewSet, Hair_stylesViewSet, AccessoriesViewSet, RecommendationsViewSet, Recommendations_hair_stylesViewSet, Recommendations_accessoriesViewSet, FeedbackViewSet, HistoryViewSet, CustomAuthToken, RegisterView
+from .views import FaceShapeViewSet, HairStyleViewSet, AccessoryViewSet, RecommendationsViewSet, CustomAuthToken, RegisterView, FeedbackViewSet, HistoryViewSet, predict
 
 router = DefaultRouter()
-router.register(r'face_shape', Face_shapeViewSet)
-router.register(r'hair_styles', Hair_stylesViewSet)
-router.register(r'accessories', AccessoriesViewSet)
+router.register(r'face-shapes', FaceShapeViewSet)
+router.register(r'hair-styles', HairStyleViewSet)
+router.register(r'accessories', AccessoryViewSet)
 router.register(r'recommendations', RecommendationsViewSet)
-router.register(r'recommendations_hair_styles', Recommendations_hair_stylesViewSet)
-router.register(r'recommendations_accessories', Recommendations_accessoriesViewSet)
 router.register(r'feedback', FeedbackViewSet)
 router.register(r'history', HistoryViewSet)
 
@@ -16,5 +14,6 @@ urlpatterns = [
     path('', include(router.urls)),
     path('auth/', CustomAuthToken.as_view(), name='auth'),   
     path('register/', RegisterView.as_view(), name='register'),
+    path('predict/', predict, name='predict'),
 ]
 

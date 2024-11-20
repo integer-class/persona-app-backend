@@ -22,12 +22,15 @@ transform = transforms.Compose([
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
 ])
 
+# Define the label mapping  
+label_mapping = {0: 'Heart', 1: 'Oblong', 2: 'Oval', 3: 'Round', 4: 'Square'}
+
 def predict_face_shape(image_path):
     image = Image.open(image_path)
     image = transform(image).unsqueeze(0)  # Add batch dimension
 
-    with torch.no_grad():
+    with torch.inference_mode():
         outputs = model(image)
         _, predicted = torch.max(outputs, 1)
     
-    return predicted.item()
+    return label_mapping[predicted.item()]

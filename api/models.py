@@ -1,54 +1,85 @@
 from django.db import models
 from django.contrib.auth.models import User
-    
-class Face_shape(models.Model):
-    id = models.AutoField(primary_key=True)
-    name = models.CharField(max_length=50)
-    create_at = models.DateTimeField(auto_now_add=True)
-    update_at = models.DateTimeField(auto_now=True)
 
-class Hair_styles(models.Model):
-    id = models.AutoField(primary_key=True)
-    name = models.CharField(max_length=100)
+GENDER_CHOICES = [
+    ('male', 'Male'),
+    ('female', 'Female'),
+]
+
+class TimeStampedModel(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        abstract = True
+
+class FaceShape(TimeStampedModel):
+    name = models.CharField(max_length=50, unique=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name = "Face Shape"
+        verbose_name_plural = "Face Shapes"
+
+class HairStyle(TimeStampedModel):
+    name = models.CharField(max_length=100, unique=True)
     image = models.ImageField(upload_to='images/hair_styles')
-    create_at = models.DateTimeField(auto_now_add=True)
-    update_at = models.DateTimeField(auto_now=True)
-    
-class Accessories(models.Model):
-    id = models.AutoField(primary_key=True)
-    name = models.CharField(max_length=100)
+    description = models.TextField(blank=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name = "Hair Style"
+        verbose_name_plural = "Hair Styles"
+
+class Accessory(TimeStampedModel):
+    name = models.CharField(max_length=100, unique=True)
     image = models.ImageField(upload_to='images/accessories')
-    create_at = models.DateTimeField(auto_now_add=True)
-    update_at = models.DateTimeField(auto_now=True)
-    
-class Recommendations(models.Model):
-    id = models.AutoField(primary_key=True)
-    Face_shape = models.ForeignKey(Face_shape, on_delete=models.CASCADE)
-    create_at = models.DateTimeField(auto_now_add=True)
-    
-class Recommendations_hair_styles(models.Model):
-    id = models.AutoField(primary_key=True)
-    Recommendations = models.ForeignKey(Recommendations, on_delete=models.CASCADE)
-    Hair_styles = models.ForeignKey(Hair_styles, on_delete=models.CASCADE)
-    create_at = models.DateTimeField(auto_now_add=True)
-    
-class Recommendations_accessories(models.Model):
-    id = models.AutoField(primary_key=True)
-    Recommendations = models.ForeignKey(Recommendations, on_delete=models.CASCADE)
-    Accessories = models.ForeignKey(Accessories, on_delete=models.CASCADE)
-    create_at = models.DateTimeField(auto_now_add=True)
+    description = models.TextField(blank=True)
 
-class Feedback(models.Model):
-    id = models.AutoField(primary_key=True)
-    Recommendations = models.ForeignKey(Recommendations, on_delete=models.CASCADE)
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name = "Accessory"
+        verbose_name_plural = "Accessories"
+
+class Recommendation(TimeStampedModel):
+    face_shape = models.ForeignKey(FaceShape, on_delete=models.CASCADE, related_name='recommendations')
+    gender = models.CharField(max_length=6, choices=GENDER_CHOICES)
+    hair_styles = models.ManyToManyField(HairStyle, related_name='recommendations')
+    accessories = models.ManyToManyField(Accessory, related_name='recommendations')
+
+    def __str__(self):
+        return f"{self.face_shape.name} - {self.gender}"
+
+    class Meta:
+        verbose_name = "Recommendation"
+        verbose_name_plural = "Recommendations"
+
+class Feedback(TimeStampedModel):
+    recommendation = models.ForeignKey(Recommendation, on_delete=models.CASCADE, related_name='feedbacks')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='feedbacks')
     comment = models.TextField(blank=True)
-    rating = models.IntegerField(default=0)
-    create_at = models.DateTimeField(auto_now_add=True)
-    
+    rating = models.PositiveSmallIntegerField(default=0, choices=[(i, str(i)) for i in range(1, 6)])
 
-class History(models.Model):
-    id = models.AutoField(primary_key=True)
-    Recommendations = models.ForeignKey(Recommendations, on_delete=models.CASCADE)
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    create_at = models.DateTimeField(auto_now_add=True)
+    def __str__(self):
+        return f"Feedback by {self.user.username} for {self.recommendation}"
+
+    class Meta:
+        verbose_name = "Feedback"
+        verbose_name_plural = "Feedbacks"
+
+class History(TimeStampedModel):
+    recommendation = models.ForeignKey(Recommendation, on_delete=models.CASCADE, related_name='history')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='history')
+
+    def __str__(self):
+        return f"History of {self.user.username} - {self.recommendation}"
+
+    class Meta:
+        verbose_name = "History"
+        verbose_name_plural = "Histories"

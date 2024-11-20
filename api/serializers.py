@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
-from .models import Face_shape, Hair_styles, Accessories, Recommendations, Recommendations_hair_styles, Recommendations_accessories, Feedback, History
+from .models import FaceShape, HairStyle, Accessory, Recommendation, Feedback, History
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -12,34 +12,24 @@ class UserSerializer(serializers.ModelSerializer):
         user = User.objects.create_user(**validated_data)
         return user
 
-class Face_shapeSerializer(serializers.ModelSerializer):
+class FaceShapeSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Face_shape
+        model = FaceShape
         fields = '__all__'
-        
-class Hair_stylesSerializer(serializers.ModelSerializer):
+
+class HairStyleSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Hair_styles
+        model = HairStyle
         fields = '__all__'
-        
-class AccessoriesSerializer(serializers.ModelSerializer):
+
+class AccessorySerializer(serializers.ModelSerializer):
     class Meta:
-        model = Accessories
+        model = Accessory
         fields = '__all__'
         
 class RecommendationsSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Recommendations
-        fields = '__all__'
-        
-class Recommendations_hair_stylesSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Recommendations_hair_styles
-        fields = '__all__'
-        
-class Recommendations_accessoriesSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Recommendations_accessories
+        model = Recommendation
         fields = '__all__'
         
 class FeedbackSerializer(serializers.ModelSerializer):
