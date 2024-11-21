@@ -11,6 +11,9 @@ from .views import (
     RegisterView,
     predict,
     UserProfileView,
+    PasswordChangeView,
+    PasswordResetView,
+    PasswordResetConfirmView,
 )
 
 router = DefaultRouter()
@@ -27,5 +30,8 @@ urlpatterns = [
     path('register/', RegisterView.as_view(), name='register'),
     path('predict/', predict, name='predict'),
     path('profile/', UserProfileView.as_view(), name='profile'),
+    path('password-change/', PasswordChangeView.as_view(), name='password-change'),
+    path('password-reset/', PasswordResetView.as_view(), name='password_reset'),
+    path('password-reset/confirm/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
 ]
 

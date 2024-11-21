@@ -1,6 +1,6 @@
 from rest_framework import viewsets, status, generics, permissions
 from django.contrib.auth.models import User
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.authtoken.models import Token
@@ -8,7 +8,19 @@ from rest_framework.decorators import api_view, parser_classes
 from rest_framework.parsers import MultiPartParser
 from .inference import predict_face_shape
 from .models import FaceShape, HairStyle, Accessory, Recommendation, Feedback, History, UserProfile
-from .serializers import UserSerializer, FaceShapeSerializer, HairStyleSerializer, AccessorySerializer, RecommendationsSerializer, FeedbackSerializer, HistorySerializer, UserProfileSerializer
+from .serializers import (
+    FaceShapeSerializer,
+    HairStyleSerializer,
+    AccessorySerializer,
+    RecommendationsSerializer,
+    FeedbackSerializer,
+    HistorySerializer,
+    UserSerializer,
+    UserProfileSerializer,
+    PasswordChangeSerializer,
+    PasswordResetSerializer, 
+    PasswordResetConfirmSerializer
+)
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from django_ratelimit.decorators import ratelimit
@@ -47,7 +59,6 @@ class RegisterView(generics.CreateAPIView):
                 'token' : token.key
             }
         }, status=status.HTTP_201_CREATED)
-        
 
 class UserProfileView(generics.RetrieveUpdateAPIView):
     queryset = UserProfile.objects.all()
@@ -80,6 +91,47 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
             'data': serializer.data
         })
 
+class PasswordChangeView(generics.UpdateAPIView):
+    serializer_class = PasswordChangeSerializer
+    model = User
+    permission_classes = (IsAuthenticated,)
+
+    def get_object(self, queryset=None):
+        return self.request.user
+
+    def update(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        serializer = self.get_serializer(data=request.data)
+
+        if serializer.is_valid():
+            if not self.object.check_password(serializer.data.get("old_password")):
+                return Response({"old_password": ["Wrong password."]}, status=status.HTTP_400_BAD_REQUEST)
+            self.object.set_password(serializer.data.get("new_password"))
+            self.object.save()
+            return Response({"status": "success", "message": "Password updated successfully"}, status=status.HTTP_200_OK)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class PasswordResetView(generics.GenericAPIView):
+    serializer_class = PasswordResetSerializer
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({"detail": "Password reset e-mail has been sent."}, status=status.HTTP_200_OK)
+
+class PasswordResetConfirmView(generics.GenericAPIView):
+    serializer_class = PasswordResetConfirmSerializer
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({"detail": "Password has been reset with the new password."}, status=status.HTTP_200_OK)
+    
 class FaceShapeViewSet(viewsets.ModelViewSet):
     queryset = FaceShape.objects.all()
     serializer_class = FaceShapeSerializer
@@ -91,7 +143,7 @@ class HairStyleViewSet(viewsets.ModelViewSet):
 class AccessoryViewSet(viewsets.ModelViewSet):
     queryset = Accessory.objects.all()
     serializer_class = AccessorySerializer
-    
+
 class RecommendationsViewSet(viewsets.ModelViewSet):
     queryset = (
         Recommendation.objects
@@ -111,7 +163,7 @@ class FeedbackViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
-    
+
 class HistoryViewSet(viewsets.ModelViewSet):
     queryset = History.objects.all()
     serializer_class = HistorySerializer
@@ -119,9 +171,10 @@ class HistoryViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         return History.objects.filter(user=self.request.user)
-    
+
 @api_view(['POST'])
 @parser_classes([MultiPartParser])
+@ratelimit(key='ip', rate='5/m', method='POST', block=True)
 def predict(request):
     if 'image' not in request.FILES:
         return Response({'status': 'error', 'message': 'No image provided'}, status=status.HTTP_400_BAD_REQUEST)
@@ -132,18 +185,17 @@ def predict(request):
     image = request.FILES['image']
     gender = request.data['gender']
     
-    # Save the uploaded image
+    # Simpan dan prediksi gambar
     image_name = default_storage.save(f'uploads/{image.name}', ContentFile(image.read()))
     image_path = default_storage.path(image_name)
     
-    predicted_face_shape = predict_face_shape(image_path)  # Your prediction function
+    predicted_face_shape = predict_face_shape(image_path)
 
     try:
         face_shape = FaceShape.objects.get(name=predicted_face_shape)
         recommendations = Recommendation.objects.filter(face_shape=face_shape, gender=gender)
         serializer = RecommendationsSerializer(recommendations, many=True)
         
-        # Save the prediction to history
         user = request.user
         History.objects.create(user=user, recommendation=recommendations.first(), image=image_name)
         
