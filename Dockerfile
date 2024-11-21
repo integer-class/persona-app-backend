@@ -1,12 +1,25 @@
-FROM python:3.10.0
+# Use the official Python image from the Docker Hub
+FROM python:3.10-slim
 
+# Set environment variables
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 
-WORKDIR /code
+# Set the working directory
+WORKDIR /app
 
-COPY requirements.txt /code/
+# Copy the requirements file
+COPY requirements.txt /app/
+
+# Install the dependencies
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
 
-COPY . /code/
+# Copy the rest of the application code
+COPY . /app/
+
+# Expose the port the app runs on
+EXPOSE 8000
+
+# Run the application
+CMD ["gunicorn", "--config", "gunicorn_config.py", "config.wsgi:application"]
