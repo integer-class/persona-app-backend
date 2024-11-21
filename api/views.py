@@ -11,6 +11,7 @@ from .models import FaceShape, HairStyle, Accessory, Recommendation, Feedback, H
 from .serializers import UserSerializer, FaceShapeSerializer, HairStyleSerializer, AccessorySerializer, RecommendationsSerializer, FeedbackSerializer, HistorySerializer, UserProfileSerializer
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
+from django_ratelimit.decorators import ratelimit
 
 class CustomAuthToken(ObtainAuthToken):
     def post(self, request, *args, **kwargs):
@@ -19,7 +20,13 @@ class CustomAuthToken(ObtainAuthToken):
         user = serializer.validated_data['user']
         token, created = Token.objects.get_or_create(user=user)
         return Response({
-            'token': token.key, 'user_id': user.pk, 'email': user.email
+            'status': 'success',
+            'message': 'User authenticated successfully',
+            'data': {
+                'token': token.key,
+                'user_id': user.pk,
+                'email': user.email
+                }
             }, status=status.HTTP_200_OK)
 
 class RegisterView(generics.CreateAPIView):
@@ -33,8 +40,12 @@ class RegisterView(generics.CreateAPIView):
         user = serializer.save()
         token = Token.objects.create(user=user)
         return Response({
-            "user": UserSerializer(user, context=self.get_serializer_context()).data,
-            "token": token.key
+            'status' : 'success',
+            'message' : 'User registered successfully',
+            'data' : {
+                'user' : UserSerializer(user, context=self.get_serializer_context()).data,
+                'token' : token.key
+            }
         }, status=status.HTTP_201_CREATED)
         
 
@@ -47,6 +58,27 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
         user = self.request.user
         profile, created = UserProfile.objects.get_or_create(user=user)
         return profile
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return Response({
+            'status': 'success',
+            'message': 'User profile retrieved successfully',
+            'data': serializer.data
+        })
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response({
+            'status': 'success',
+            'message': 'User profile updated successfully',
+            'data': serializer.data
+        })
 
 class FaceShapeViewSet(viewsets.ModelViewSet):
     queryset = FaceShape.objects.all()
@@ -92,10 +124,10 @@ class HistoryViewSet(viewsets.ModelViewSet):
 @parser_classes([MultiPartParser])
 def predict(request):
     if 'image' not in request.FILES:
-        return Response({'error': 'No image provided'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'status': 'error', 'message': 'No image provided'}, status=status.HTTP_400_BAD_REQUEST)
     
     if 'gender' not in request.data:
-        return Response({'error': 'No gender provided'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'status': 'error', 'message': 'No gender provided'}, status=status.HTTP_400_BAD_REQUEST)
     
     image = request.FILES['image']
     gender = request.data['gender']
@@ -115,8 +147,12 @@ def predict(request):
         user = request.user
         History.objects.create(user=user, recommendation=recommendations.first(), image=image_name)
         
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response({
+            'status': 'success',
+            'message': 'Recommendations retrieved successfully',
+            'data': serializer.data
+        }, status=status.HTTP_200_OK)
     except FaceShape.DoesNotExist:
-        return Response({'error': 'Face shape not found'}, status=status.HTTP_404_NOT_FOUND)
+        return Response({'status': 'error', 'message': 'Face shape not found'}, status=status.HTTP_404_NOT_FOUND)
     except Recommendation.DoesNotExist:
-        return Response({'error': 'No recommendations found for the given face shape and gender'}, status=status.HTTP_404_NOT_FOUND)
+        return Response({'status': 'error', 'message': 'No recommendations found for the given face shape and gender'}, status=status.HTTP_404_NOT_FOUND)

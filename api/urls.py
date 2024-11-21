@@ -1,6 +1,17 @@
 from django.urls import path, include 
 from rest_framework.routers import DefaultRouter
-from .views import FaceShapeViewSet, HairStyleViewSet, AccessoryViewSet, RecommendationsViewSet, CustomAuthToken, RegisterView, FeedbackViewSet, HistoryViewSet, UserProfileView, predict
+from .views import (
+    FaceShapeViewSet,
+    HairStyleViewSet,
+    AccessoryViewSet,
+    RecommendationsViewSet,
+    FeedbackViewSet,
+    HistoryViewSet,
+    CustomAuthToken,
+    RegisterView,
+    predict,
+    UserProfileView,
+)
 
 router = DefaultRouter()
 router.register(r'face-shapes', FaceShapeViewSet)
