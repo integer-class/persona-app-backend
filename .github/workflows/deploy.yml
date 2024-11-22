@@ -28,7 +28,12 @@ jobs:
       run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
     - name: Build and push Docker image
-      run: docker buildx build --cache-from type=local,src=/tmp/.buildx-cache --cache-to type=local,dest=/tmp/.buildx-cache-new --push --tag ${{ secrets.DOCKER_USERNAME }}/bismillah-selesai:latest .
+      run: |
+        docker buildx build \
+          --cache-from=type=registry,ref=${{ secrets.DOCKER_USERNAME }}/bismillah-selesai:cache \
+          --cache-to=type=registry,ref=${{ secrets.DOCKER_USERNAME }}/bismillah-selesai:cache,mode=max \
+          --push \
+          --tag ${{ secrets.DOCKER_USERNAME }}/bismillah-selesai:latest .
 
     - name: Deploy to VPS
-      run: sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'cd /path/to/your/app && docker-compose pull && docker-compose up -d'
+      run: sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'cd /home/bismillah-selesai && docker-compose pull && docker-compose up -d'
