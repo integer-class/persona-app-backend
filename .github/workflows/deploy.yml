@@ -36,4 +36,4 @@ jobs:
           --tag ${{ secrets.DOCKER_USERNAME }}/bismillah-selesai:latest .
 
     - name: Deploy to VPS
-      run: sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'cd /home/bismillah-selesai && docker-compose pull && docker-compose up -d'
+      run: sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -v -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'cd /home/bismillah-selesai && docker-compose pull && docker-compose up -d'
