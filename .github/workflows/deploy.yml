@@ -8,16 +8,15 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
     - name: Checkout code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v1
+      uses: docker/setup-buildx-action@v3
 
     - name: Cache Docker layers
-      uses: actions/cache@v2
+      uses: actions/cache@v4
       with:
         path: /tmp/.buildx-cache
         key: ${{ runner.os }}-buildx-${{ github.sha }}
@@ -25,15 +24,47 @@ jobs:
           ${{ runner.os }}-buildx-
 
     - name: Log in to Docker Hub
-      run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
 
     - name: Build and push Docker image
-      run: |
-        docker buildx build \
-          --cache-from=type=registry,ref=${{ secrets.DOCKER_USERNAME }}/bismillah-selesai:cache \
-          --cache-to=type=registry,ref=${{ secrets.DOCKER_USERNAME }}/bismillah-selesai:cache,mode=max \
-          --push \
-          --tag ${{ secrets.DOCKER_USERNAME }}/bismillah-selesai:latest .
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: true
+        tags: ${{ secrets.DOCKER_USERNAME }}/bismillah-selesai:latest
+        cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/bismillah-selesai:cache
+        cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/bismillah-selesai:cache,mode=max
 
+    - name: Install SSH tools
+      run: sudo apt-get update && sudo apt-get install -y sshpass netcat
+
+    - name: Test SSH connection
+      run: |
+        echo "Testing SSH connection..."
+        sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'echo "SSH connection successful"' || {
+          echo "SSH connection failed with exit code $?"
+          exit 1
+        }
+
+    - name: Check VPS connectivity
+      run: |
+        echo "Checking connectivity to VPS..."
+        nc -zv ${{ secrets.VPS_HOST }} 22 || {
+          echo "Port 22 is not reachable"
+          exit 1
+        }
+        
     - name: Deploy to VPS
-      run: sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -v -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'cd /home/bismillah-selesai && docker-compose pull && docker-compose up -d'
+      run: |
+        echo "Starting deployment..."
+        sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -v -o StrictHostKeyChecking=no -o ConnectTimeout=30 ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} '
+          cd /home/bismillah-selesai && 
+          docker-compose pull && 
+          docker-compose up -d
+        ' || {
+          echo "Deployment failed with exit code $?"
+          exit 1
+        }
