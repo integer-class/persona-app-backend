@@ -30,6 +30,15 @@ jobs:
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
 
+    - name: Copy files to VPS
+      uses: appleboy/scp-action@v0.1.7
+      with:
+        host: ${{ secrets.VPS_HOST }}
+        username: ${{ secrets.VPS_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        source: "./*"
+        target: "/home/bismillah-selesai/"
+
     - name: Build and push Docker image
       uses: docker/build-push-action@v5
       with:
