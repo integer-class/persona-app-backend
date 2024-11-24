@@ -47,5 +47,5 @@ jobs:
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         script: |
           cd /home/bismillah-selesai
-          docker-compose pull
-          docker-compose up -d
+          sudo docker-compose pull
+          sudo docker-compose up -d
