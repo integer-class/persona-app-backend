@@ -8,6 +8,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -38,33 +39,13 @@ jobs:
         cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/bismillah-selesai:cache
         cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/bismillah-selesai:cache,mode=max
 
-    - name: Install SSH tools
-      run: sudo apt-get update && sudo apt-get install -y sshpass netcat
-
-    - name: Test SSH connection
-      run: |
-        echo "Testing SSH connection..."
-        sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'echo "SSH connection successful"' || {
-          echo "SSH connection failed with exit code $?"
-          exit 1
-        }
-
-    - name: Check VPS connectivity
-      run: |
-        echo "Checking connectivity to VPS..."
-        nc -zv ${{ secrets.VPS_HOST }} 22 || {
-          echo "Port 22 is not reachable"
-          exit 1
-        }
-        
     - name: Deploy to VPS
-      run: |
-        echo "Starting deployment..."
-        sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -v -o StrictHostKeyChecking=no -o ConnectTimeout=30 ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} '
-          cd /home/bismillah-selesai && 
-          docker-compose pull && 
+      uses: appleboy/ssh-action@v0.1.7
+      with:
+        host: ${{ secrets.VPS_HOST }}
+        username: ${{ secrets.VPS_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script: |
+          cd /home/bismillah-selesai
+          docker-compose pull
           docker-compose up -d
-        ' || {
-          echo "Deployment failed with exit code $?"
-          exit 1
-        }
