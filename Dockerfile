@@ -21,5 +21,8 @@ COPY . /app/
 # Expose the port the app runs on
 EXPOSE 8000
 
+# Set file permissions
+RUN chmod -R 755 /app/static
+
 # Run the application
 CMD ["gunicorn", "--config", "gunicorn_config.py", "config.wsgi:application"]
