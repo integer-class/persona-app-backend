@@ -15,6 +15,7 @@ services:
     command: gunicorn --config gunicorn_config.py config.wsgi:application
     volumes:
       - .:/app
+      - static_volume:/app/static
     ports:
       - "8000:8000"
     env_file:
@@ -24,3 +25,4 @@ services:
 
 volumes:
   postgres_data:
+  static_volume:
