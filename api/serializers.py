@@ -69,12 +69,12 @@ class PasswordResetSerializer(serializers.Serializer):
         for user in users:
             token = default_token_generator.make_token(user)
             uid = urlsafe_base64_encode(force_bytes(user.pk))
-            reset_url = f"{settings.FRONTEND_URL}/reset-password/{uid}/{token}/"
+            # reset_url = f"{settings.FRONTEND_URL}/reset-password/{uid}/{token}/"
             send_mail(
-                "Password Reset Request",
-                f"Click the link to reset your password: {reset_url}",
-                settings.DEFAULT_FROM_EMAIL,
-                [email],
+                subject="Password Reset Request",
+                message=f"Your reset code is {uid}/{token}",
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[email],
             )
 
 class PasswordResetConfirmSerializer(serializers.Serializer):
