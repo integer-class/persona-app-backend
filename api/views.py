@@ -205,7 +205,13 @@ def predict(request):
     try:
         face_shape = FaceShape.objects.get(name=predicted_face_shape)
         recommendations = Recommendation.objects.filter(face_shape=face_shape, gender=gender)
-        serializer = RecommendationsSerializer(recommendations, many=True)
+        recommended_hair_styles = recommendations.values_list('hair_style', flat=True)
+        
+        hair_styles = HairStyle.objects.all()
+        hair_style_data = HairStyleSerializer(hair_styles, many=True).data
+        
+        for hair_style in hair_style_data:
+            hair_style['highlight'] = hair_style['id'] in recommended_hair_styles
         
         user = request.user
         History.objects.create(user=user, recommendation=recommendations.first(), image=image_name)
@@ -213,7 +219,10 @@ def predict(request):
         return Response({
             'status': 'success',
             'message': 'Recommendations retrieved successfully',
-            'data': serializer.data
+            'data': {
+                'hair_styles': hair_style_data,
+                'recommendations': RecommendationsSerializer(recommendations, many=True).data
+            }
         }, status=status.HTTP_200_OK)
     except FaceShape.DoesNotExist:
         return Response({'status': 'error', 'message': 'Face shape not found'}, status=status.HTTP_404_NOT_FOUND)
