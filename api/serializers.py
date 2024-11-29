@@ -26,13 +26,15 @@ class UserSerializer(serializers.ModelSerializer):
         return user
 class UserProfileSerializer(serializers.ModelSerializer):
     user = UserSerializer()
+    new_email = serializers.EmailField(write_only=True, required=False)
 
     class Meta:
         model = UserProfile
-        fields = ('user', 'avatar')
+        fields = ('user', 'avatar', 'new_email')
 
     def update(self, instance, validated_data):
         user_data = validated_data.pop('user', {})
+        new_email = validated_data.pop('new_email', None)
         avatar = validated_data.get('avatar')
 
         # Update User fields
@@ -47,6 +49,18 @@ class UserProfileSerializer(serializers.ModelSerializer):
         if avatar:
             instance.avatar = avatar
         instance.save()
+
+        # Handle email change
+        if new_email:
+            token = default_token_generator.make_token(user)
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            verification_url = f"{settings.FRONTEND_URL}/verify-email/{uid}/{token}/"
+            send_mail(
+                subject="Verify your new email address",
+                message=f"Click the link to verify your new email address: {verification_url}",
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[new_email],
+            )
 
         return instance
 
@@ -69,10 +83,10 @@ class PasswordResetSerializer(serializers.Serializer):
         for user in users:
             token = default_token_generator.make_token(user)
             uid = urlsafe_base64_encode(force_bytes(user.pk))
-            # reset_url = f"{settings.FRONTEND_URL}/reset-password/{uid}/{token}/"
+            reset_url = f"{settings.FRONTEND_URL}/reset-password/{uid}/{token}/"
             send_mail(
                 subject="Password Reset Request",
-                message=f"Your reset code is {uid}/{token}",
+                message=f"Click the link to reset your password: {reset_url}",
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 recipient_list=[email],
             )

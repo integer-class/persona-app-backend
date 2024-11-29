@@ -7,6 +7,10 @@ from rest_framework.authtoken.models import Token
 from rest_framework.decorators import api_view, parser_classes
 from rest_framework.parsers import MultiPartParser
 from .inference import predict_face_shape
+from django.utils.http import urlsafe_base64_decode
+from django.contrib.auth.tokens import default_token_generator
+from django.views.decorators.cache import cache_page
+from django.utils.decorators import method_decorator
 from .models import FaceShape, HairStyle, Accessory, Recommendation, Feedback, History, UserProfile
 from .serializers import (
     FaceShapeSerializer,
@@ -26,6 +30,7 @@ from django.core.files.base import ContentFile
 from django_ratelimit.decorators import ratelimit
 
 class CustomAuthToken(ObtainAuthToken):
+    @ratelimit(key='ip', rate='5/m', method='POST', block=True)
     def post(self, request, *args, **kwargs):
         serializer = self.serializer_class(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
@@ -46,6 +51,7 @@ class RegisterView(generics.CreateAPIView):
     permission_classes = (AllowAny,)
     serializer_class = UserSerializer
     
+    @ratelimit(key='ip', rate='5/m', method='POST', block=True)
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -70,26 +76,28 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
         profile, created = UserProfile.objects.get_or_create(user=user)
         return profile
 
-    def retrieve(self, request, *args, **kwargs):
-        instance = self.get_object()
-        serializer = self.get_serializer(instance)
-        return Response({
-            'status': 'success',
-            'message': 'User profile retrieved successfully',
-            'data': serializer.data
-        })
+class UpdateProfileView(generics.UpdateAPIView):
+    serializer_class = UserProfileSerializer
+    permission_classes = [IsAuthenticated]
 
-    def update(self, request, *args, **kwargs):
-        partial = kwargs.pop('partial', False)
-        instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data, partial=partial)
-        serializer.is_valid(raise_exception=True)
-        self.perform_update(serializer)
-        return Response({
-            'status': 'success',
-            'message': 'User profile updated successfully',
-            'data': serializer.data
-        })
+    def get_object(self):
+        return UserProfileView.get_object(self)
+
+class VerifyEmailView(generics.GenericAPIView):
+    def get(self, request, uidb64, token):
+        try:
+            uid = urlsafe_base64_decode(uidb64).decode()
+            user = User.objects.get(pk=uid)
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            user = None
+
+        if user is not None and default_token_generator.check_token(user, token):
+            user.email = request.query_params.get('email')
+            user.save()
+            return Response({'status': 'success', 'message': 'Email verified successfully'}, status=status.HTTP_200_OK)
+        else:
+            return Response({'status': 'error', 'message': 'Invalid token'}, status=status.HTTP_400_BAD_REQUEST)
+
 
 class PasswordChangeView(generics.UpdateAPIView):
     serializer_class = PasswordChangeSerializer
@@ -169,8 +177,15 @@ class HistoryViewSet(viewsets.ModelViewSet):
     serializer_class = HistorySerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    @method_decorator(cache_page(60*15))  # Cache selama 15 menit
     def get_queryset(self):
         return History.objects.filter(user=self.request.user)
+
+def save_image_and_predict(image):
+    image_name = default_storage.save(f'uploads/{image.name}', ContentFile(image.read()))
+    image_path = default_storage.path(image_name)
+    predicted_face_shape = predict_face_shape(image_path)
+    return image_name, predicted_face_shape
 
 @api_view(['POST'])
 @parser_classes([MultiPartParser])
@@ -185,11 +200,7 @@ def predict(request):
     image = request.FILES['image']
     gender = request.data['gender']
     
-    # Simpan dan prediksi gambar
-    image_name = default_storage.save(f'uploads/{image.name}', ContentFile(image.read()))
-    image_path = default_storage.path(image_name)
-    
-    predicted_face_shape = predict_face_shape(image_path)
+    image_name, predicted_face_shape = save_image_and_predict(image)
 
     try:
         face_shape = FaceShape.objects.get(name=predicted_face_shape)
@@ -208,3 +219,12 @@ def predict(request):
         return Response({'status': 'error', 'message': 'Face shape not found'}, status=status.HTTP_404_NOT_FOUND)
     except Recommendation.DoesNotExist:
         return Response({'status': 'error', 'message': 'No recommendations found for the given face shape and gender'}, status=status.HTTP_404_NOT_FOUND)
+    
+@api_view(['POST'])
+@ratelimit(key='ip', rate='5/m', method='POST', block=True)
+def logout(request):
+    try:
+        request.user.auth_token.delete()
+        return Response({'status': 'success', 'message': 'Logged out successfully'}, status=status.HTTP_200_OK)
+    except Token.DoesNotExist:
+        return Response({'status': 'error', 'message': 'Invalid token'}, status=status.HTTP_400_BAD_REQUEST)

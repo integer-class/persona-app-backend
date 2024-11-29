@@ -14,6 +14,9 @@ from .views import (
     PasswordChangeView,
     PasswordResetView,
     PasswordResetConfirmView,
+    logout,
+    UpdateProfileView,
+    VerifyEmailView,
 )
 
 router = DefaultRouter()
@@ -26,10 +29,13 @@ router.register(r'history', HistoryViewSet)
 
 urlpatterns = [        
     path('', include(router.urls)),
-    path('auth/', CustomAuthToken.as_view(), name='auth'),   
+    path('login/', CustomAuthToken.as_view(), name='auth'),   
     path('register/', RegisterView.as_view(), name='register'),
+    path('logout/', logout, name='logout'),
     path('predict/', predict, name='predict'),
     path('profile/', UserProfileView.as_view(), name='profile'),
+    path('profile/update/', UpdateProfileView.as_view(), name='profile-update'),
+    path('verify-email/<uidb64>/<token>/', VerifyEmailView.as_view(), name='verify-email'),
     path('password-change/', PasswordChangeView.as_view(), name='password-change'),
     path('password-reset/', PasswordResetView.as_view(), name='password_reset'),
     path('password-reset/confirm/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
