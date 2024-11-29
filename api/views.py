@@ -30,7 +30,6 @@ from django.core.files.base import ContentFile
 from django_ratelimit.decorators import ratelimit
 
 class CustomAuthToken(ObtainAuthToken):
-    @ratelimit(key='ip', rate='5/m', method='POST', block=True)
     def post(self, request, *args, **kwargs):
         serializer = self.serializer_class(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
@@ -51,7 +50,6 @@ class RegisterView(generics.CreateAPIView):
     permission_classes = (AllowAny,)
     serializer_class = UserSerializer
     
-    @ratelimit(key='ip', rate='5/m', method='POST', block=True)
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
