@@ -83,6 +83,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django_ratelimit.middleware.RatelimitMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -155,6 +156,28 @@ SECURE_SSL_REDIRECT = True
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
+
+# HTTP Strict Transport Security
+SECURE_HSTS_SECONDS = 31536000  # 1 year
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_HSTS_PRELOAD = True
+
+# Content Security Policy
+CSP_DEFAULT_SRC = ("'self'",)
+CSP_STYLE_SRC = ("'self'", 'https://fonts.googleapis.com')
+CSP_FONT_SRC = ("'self'", 'https://fonts.gstatic.com')
+
+# X-Content-Type-Options
+SECURE_CONTENT_TYPE_NOSNIFF = True
+
+# X-Frame-Options
+X_FRAME_OPTIONS = 'DENY'
+
+# X-XSS-Protection
+SECURE_BROWSER_XSS_FILTER = True
+
+# Referrer Policy
+SECURE_REFERRER_POLICY = 'no-referrer-when-downgrade'
 
 # Mailing 
 FRONTEND_URL = config('FRONTEND_URL')

@@ -48,6 +48,7 @@ jobs:
         source: "./*"
         target: "/home/bismillah-selesai/"
         overwrite: true
+        exclude: ".git"
 
     - name: Deploy to VPS
       uses: appleboy/ssh-action@v0.1.7
