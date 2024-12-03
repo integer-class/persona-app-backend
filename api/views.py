@@ -4,7 +4,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.authtoken.models import Token
-from rest_framework.decorators import api_view, parser_classes
+from rest_framework.decorators import api_view, parser_classes, permission_classes
 from rest_framework.parsers import MultiPartParser
 from .inference import predict_face_shape
 from django.utils.http import urlsafe_base64_decode
@@ -188,6 +188,7 @@ def save_image_and_predict(image):
 @api_view(['POST'])
 @parser_classes([MultiPartParser])
 @ratelimit(key='ip', rate='5/m', method='POST', block=True)
+@permission_classes([AllowAny])
 def predict(request):
     if 'image' not in request.FILES:
         return Response({'status': 'error', 'message': 'No image provided'}, status=status.HTTP_400_BAD_REQUEST)
@@ -211,8 +212,9 @@ def predict(request):
         for hair_style in hair_style_data:
             hair_style['highlight'] = hair_style['id'] in recommended_hair_styles
         
-        user = request.user
-        History.objects.create(user=user, recommendation=recommendations.first(), image=image_name)
+        user = request.user if request.user.is_authenticated else None
+        if user:
+            History.objects.create(user=user, recommendation=recommendations.first(), image=image_name)
         
         return Response({
             'status': 'success',
