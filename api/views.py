@@ -9,8 +9,6 @@ from rest_framework.parsers import MultiPartParser
 from .inference import predict_face_shape
 from django.utils.http import urlsafe_base64_decode
 from django.contrib.auth.tokens import default_token_generator
-from django.views.decorators.cache import cache_page
-from django.utils.decorators import method_decorator
 from .models import FaceShape, HairStyle, Accessory, Recommendation, Feedback, History, UserProfile
 from .serializers import (
     FaceShapeSerializer,
@@ -175,7 +173,6 @@ class HistoryViewSet(viewsets.ModelViewSet):
     serializer_class = HistorySerializer
     permission_classes = [permissions.IsAuthenticated]
 
-    @method_decorator(cache_page(60*15))  # Cache selama 15 menit
     def get_queryset(self):
         return History.objects.filter(user=self.request.user)
 
