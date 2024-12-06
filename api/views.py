@@ -201,13 +201,19 @@ def predict(request):
     try:
         face_shape = FaceShape.objects.get(name=predicted_face_shape)
         recommendations = Recommendation.objects.filter(face_shape=face_shape, gender=gender)
-        recommended_hair_styles = recommendations.values_list('hair_style', flat=True)
+        recommended_hair_styles = recommendations.values_list('hair_styles', flat=True)
         
-        hair_styles = HairStyle.objects.all()
+        hair_styles = HairStyle.objects.filter(gender=gender)
         hair_style_data = HairStyleSerializer(hair_styles, many=True).data
         
         for hair_style in hair_style_data:
             hair_style['highlight'] = hair_style['id'] in recommended_hair_styles
+            
+        accessories = Accessory.objects.all()
+        accessory_data = AccessorySerializer(accessories, many=True).data
+        
+        for accessory in accessory_data:
+            accessory['highlight'] = False
         
         user = request.user if request.user.is_authenticated else None
         if user:
@@ -217,14 +223,15 @@ def predict(request):
             'status': 'success',
             'message': 'Recommendations retrieved successfully',
             'data': {
+                'image_name': image_name,
+                'predicted_face_shape': predicted_face_shape,
                 'hair_styles': hair_style_data,
+                'accessories': accessory_data,
                 'recommendations': RecommendationsSerializer(recommendations, many=True).data
             }
         }, status=status.HTTP_200_OK)
     except FaceShape.DoesNotExist:
         return Response({'status': 'error', 'message': 'Face shape not found'}, status=status.HTTP_404_NOT_FOUND)
-    except Recommendation.DoesNotExist:
-        return Response({'status': 'error', 'message': 'No recommendations found for the given face shape and gender'}, status=status.HTTP_404_NOT_FOUND)
     
 @api_view(['POST'])
 @ratelimit(key='ip', rate='5/m', method='POST', block=True)

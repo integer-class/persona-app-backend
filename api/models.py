@@ -32,10 +32,15 @@ class FaceShape(TimeStampedModel):
         verbose_name_plural = "Face Shapes"
 
 class HairStyle(TimeStampedModel):
+    GENDER_CHOICES = [
+        ('male', 'Male'),
+        ('female', 'Female'),
+    ]
     name = models.CharField(max_length=100, unique=True)
     image = models.ImageField(upload_to='images/hair_styles')
     description = models.TextField(blank=True)
-
+    gender = models.CharField(max_length=6, choices=GENDER_CHOICES)
+    
     def __str__(self):
         return self.name
 
