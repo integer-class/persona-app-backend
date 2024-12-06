@@ -44,9 +44,14 @@ class HairStyle(TimeStampedModel):
         verbose_name_plural = "Hair Styles"
 
 class Accessory(TimeStampedModel):
+    CATEGORY_CHOICES = [
+        ('glasses', 'Glasses'),
+        ('earrings', 'Earrings'),
+    ]
     name = models.CharField(max_length=100, unique=True)
     image = models.ImageField(upload_to='images/accessories')
     description = models.TextField(blank=True)
+    category = models.CharField(max_length=10, choices=CATEGORY_CHOICES)
 
     def __str__(self):
         return self.name
