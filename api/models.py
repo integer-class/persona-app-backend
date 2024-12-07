@@ -102,3 +102,16 @@ class History(TimeStampedModel):
     class Meta:
         verbose_name = "History"
         verbose_name_plural = "Histories"
+        
+class UserSelection(TimeStampedModel):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='selections')
+    recommendation = models.ForeignKey(Recommendation, on_delete=models.CASCADE, related_name='selections')
+    selected_hair_style = models.ForeignKey(HairStyle, on_delete=models.CASCADE, related_name='selections')
+    selected_accessories = models.ManyToManyField(Accessory, related_name='selections')
+    
+    def __str__(self):
+        return f"{self.user.username} - {self.recommendation}"
+    
+    class Meta:
+        verbose_name = "User Selection"
+        verbose_name_plural = "User Selections"

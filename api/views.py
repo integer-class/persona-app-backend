@@ -9,7 +9,7 @@ from rest_framework.parsers import MultiPartParser
 from .inference import predict_face_shape
 from django.utils.http import urlsafe_base64_decode
 from django.contrib.auth.tokens import default_token_generator
-from .models import FaceShape, HairStyle, Accessory, Recommendation, Feedback, History, UserProfile
+from .models import FaceShape, HairStyle, Accessory, Recommendation, Feedback, History, UserProfile, UserSelection
 from .serializers import (
     FaceShapeSerializer,
     HairStyleSerializer,
@@ -21,11 +21,15 @@ from .serializers import (
     UserProfileSerializer,
     PasswordChangeSerializer,
     PasswordResetSerializer, 
-    PasswordResetConfirmSerializer
+    PasswordResetConfirmSerializer,
+    UserSelectionSerializer
 )
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from django_ratelimit.decorators import ratelimit
+import logging
+
+logger = logging.getLogger(__name__)
 
 class CustomAuthToken(ObtainAuthToken):
     def post(self, request, *args, **kwargs):
@@ -148,6 +152,7 @@ class AccessoryViewSet(viewsets.ModelViewSet):
     queryset = Accessory.objects.all()
     serializer_class = AccessorySerializer
 
+
 class RecommendationsViewSet(viewsets.ModelViewSet):
     queryset = (
         Recommendation.objects
@@ -174,7 +179,15 @@ class HistoryViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return History.objects.filter(user=self.request.user)
+        return History.objects.filter(user=self.request.user).prefetch_related('user__selections')
+
+class UserSelectionViewSet(viewsets.ModelViewSet):
+    queryset = UserSelection.objects.all()
+    serializer_class = UserSelectionSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_queryset(self):
+        return UserSelection.objects.filter(user=self.request.user)
 
 def save_image_and_predict(image):
     image_name = default_storage.save(f'uploads/{image.name}', ContentFile(image.read()))
@@ -232,7 +245,43 @@ def predict(request):
         }, status=status.HTTP_200_OK)
     except FaceShape.DoesNotExist:
         return Response({'status': 'error', 'message': 'Face shape not found'}, status=status.HTTP_404_NOT_FOUND)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def save_user_selection(request):
+    user = request.user
+    recommendation_id = request.data.get('recommendation_id')
+    selected_hair_style_id = request.data.get('selected_hair_style_id')
+    selected_accessories_ids = request.data.get('selected_accessories_ids', [])
+
+    if isinstance(selected_accessories_ids, str):
+        selected_accessories_ids = selected_accessories_ids.strip('[]').split(',')
+        selected_accessories_ids = [int(id.strip()) for id in selected_accessories_ids]
     
+    try:
+        recommendation = Recommendation.objects.get(id=recommendation_id)
+        selected_hair_style = HairStyle.objects.get(id=selected_hair_style_id)
+        selected_accessories = Accessory.objects.filter(id__in=selected_accessories_ids)
+
+        user_selection = UserSelection.objects.create(
+            user=user,
+            recommendation=recommendation,
+            selected_hair_style=selected_hair_style
+        )
+        user_selection.selected_accessories.set(selected_accessories)
+        user_selection.save()
+
+        return Response({'status': 'success', 'message': 'User selection saved successfully'}, status=status.HTTP_201_CREATED)
+    except Recommendation.DoesNotExist:
+        logger.error(f"Recommendation with id {recommendation_id} does not exist")
+        return Response({'status': 'error', 'message': 'Invalid recommendation ID provided'}, status=status.HTTP_400_BAD_REQUEST)
+    except HairStyle.DoesNotExist:
+        logger.error(f"HairStyle with id {selected_hair_style_id} does not exist")
+        return Response({'status': 'error', 'message': 'Invalid hair style ID provided'}, status=status.HTTP_400_BAD_REQUEST)
+    except Accessory.DoesNotExist:
+        logger.error(f"Accessory with ids {selected_accessories_ids} do not exist")
+        return Response({'status': 'error', 'message': 'Invalid accessory IDs provided'}, status=status.HTTP_400_BAD_REQUEST)
+
 @api_view(['POST'])
 @ratelimit(key='ip', rate='5/m', method='POST', block=True)
 def logout(request):
