@@ -42,8 +42,7 @@ class CustomAuthToken(ObtainAuthToken):
             'message': 'User authenticated successfully',
             'data': {
                 'token': token.key,
-                'user_id': user.pk,
-                'email': user.email
+                'user': UserSerializer(user).data
                 }
             }, status=status.HTTP_200_OK)
 
@@ -61,8 +60,8 @@ class RegisterView(generics.CreateAPIView):
             'status' : 'success',
             'message' : 'User registered successfully',
             'data' : {
-                'user' : UserSerializer(user, context=self.get_serializer_context()).data,
-                'token' : token.key
+                'token' : token.key,
+                'user' : UserSerializer(user).data
             }
         }, status=status.HTTP_201_CREATED)
 
