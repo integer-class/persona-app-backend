@@ -19,7 +19,6 @@ from .views import (
     VerifyEmailView,
     save_user_selection,
     UserSelectionViewSet,
-    get_recommendations,
 )
 
 router = DefaultRouter()
@@ -38,7 +37,6 @@ urlpatterns = [
     path('register/', RegisterView.as_view(), name='register'),
     path('logout/', logout, name='logout'),
     path('predict/', predict, name='predict'),
-    path('recommendations/<str:face_shape>/<str:gender>/', get_recommendations, name='get_recommendations'),
     path('profile/', UserProfileView.as_view(), name='profile'),
     path('profile/update/', UpdateProfileView.as_view(), name='profile-update'),
     path('verify-email/<uidb64>/<token>/', VerifyEmailView.as_view(), name='verify-email'),

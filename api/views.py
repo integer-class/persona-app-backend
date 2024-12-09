@@ -202,42 +202,55 @@ def predict(request):
     if 'image' not in request.FILES:
         return Response({'status': 'error', 'message': 'No image provided'}, status=status.HTTP_400_BAD_REQUEST)
     
+    if 'gender' not in request.data:
+        return Response({'status': 'error', 'message': 'No gender provided'}, status=status.HTTP_400_BAD_REQUEST)
+    
     image = request.FILES['image']
+    gender = request.data['gender']
     
     image_name, predicted_face_shape = save_image_and_predict(image)
-    
-    return Response({
-        'status': 'success',
-        'data': {
-            'image_name': image_name,
-            'predicted_face_shape': predicted_face_shape
-        }
-    }, status=status.HTTP_200_OK)
 
-@api_view(['GET'])
-@permission_classes([AllowAny])
-def get_recommendations(request, face_shape, gender):
     try:
-        face_shape_obj = FaceShape.objects.get(name=face_shape)
-        recommendations = Recommendation.objects.filter(face_shape=face_shape_obj, gender=gender)
-        recommended_hair_styles = recommendations.values_list('hair_styles', flat=True)
+        face_shape = FaceShape.objects.get(name=predicted_face_shape)
+        recommendations = Recommendation.objects.filter(face_shape=face_shape, gender=gender)
+        recommended_hair_styles_ids = recommendations.values_list('hair_styles', flat=True)
+        recommended_accessories_ids = recommendations.values_list('accessories', flat=True)
         
         hair_styles = HairStyle.objects.filter(gender=gender)
-        hair_style_data = HairStyleSerializer(hair_styles, many=True).data
-        
-        for hair_style in hair_style_data:
-            hair_style['highlight'] = hair_style['id'] in recommended_hair_styles
-            
         accessories = Accessory.objects.all()
-        accessory_data = AccessorySerializer(accessories, many=True).data
         
-        for accessory in accessory_data:
-            accessory['highlight'] = False
+        recommended_hair_styles = HairStyleSerializer(
+            hair_styles.filter(id__in=recommended_hair_styles_ids), many=True
+        ).data
+        recommended_accessories = AccessorySerializer(
+            accessories.filter(id__in=recommended_accessories_ids), many=True
+        ).data
+        
+        other_hair_styles = HairStyleSerializer(
+            hair_styles.exclude(id__in=recommended_hair_styles_ids), many=True
+        ).data
+        other_accessories = AccessorySerializer(
+            accessories.exclude(id__in=recommended_accessories_ids), many=True
+        ).data
+        
+        user = request.user if request.user.is_authenticated else None
+        if user:
+            History.objects.create(user=user, recommendation=recommendations.first(), image=image_name)
         
         return Response({
-            'hair_styles': hair_style_data,
-            'accessories': accessory_data,
-            'glasses': accessory_data  # Assuming glasses are part of accessories
+            'status': 'success',
+            'data': {
+                'image_url': default_storage.url(image_name),
+                'face_shape': predicted_face_shape,
+                'recommendations': {
+                    'hair_styles': recommended_hair_styles,
+                    'accessories': recommended_accessories
+                },
+                'other_options': {
+                    'hair_styles': other_hair_styles,
+                    'accessories': other_accessories
+                }
+            }
         }, status=status.HTTP_200_OK)
     except FaceShape.DoesNotExist:
         return Response({'status': 'error', 'message': 'Face shape not found'}, status=status.HTTP_404_NOT_FOUND)
