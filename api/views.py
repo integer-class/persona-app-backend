@@ -28,6 +28,8 @@ from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from django_ratelimit.decorators import ratelimit
 import logging
+from PIL import Image
+from io import BytesIO
 
 logger = logging.getLogger(__name__)
 
@@ -189,8 +191,23 @@ class UserSelectionViewSet(viewsets.ModelViewSet):
         return UserSelection.objects.filter(user=self.request.user)
 
 def save_image_and_predict(image):
-    image_name = default_storage.save(f'uploads/{image.name}', ContentFile(image.read()))
+    # Open the image using Pillow
+    img = Image.open(image)
+
+    # Resize the image to a maximum width and height of 800 pixels
+    max_size = (800, 800)
+    img.thumbnail(max_size, Image.ANTIALIAS)
+
+    # Save the resized image to a BytesIO object
+    img_io = BytesIO()
+    img.save(img_io, format='JPEG')
+    img_io.seek(0)
+
+    # Save the image to the default storage
+    image_name = default_storage.save(f'uploads/{image.name}', ContentFile(img_io.read()))
     image_path = default_storage.path(image_name)
+
+    # Predict the face shape
     predicted_face_shape = predict_face_shape(image_path)
     return image_name, predicted_face_shape
 
