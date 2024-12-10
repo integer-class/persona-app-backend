@@ -30,6 +30,8 @@ from django_ratelimit.decorators import ratelimit
 import logging
 from PIL import Image
 from io import BytesIO
+import pyheif
+from PIL import UnidentifiedImageError
 
 logger = logging.getLogger(__name__)
 
@@ -191,20 +193,34 @@ class UserSelectionViewSet(viewsets.ModelViewSet):
         return UserSelection.objects.filter(user=self.request.user)
 
 def save_image_and_predict(image):
-    # Open the image using Pillow
-    img = Image.open(image)
+    try:
+        # Open the image using Pillow
+        img = Image.open(image)
+    except UnidentifiedImageError:
+        if image.name.lower().endswith('.heic'):
+            heif_file = pyheif.read(image)
+            img = Image.frombytes(
+                heif_file.mode, 
+                heif_file.size, 
+                heif_file.data,
+                "raw",
+                heif_file.mode,
+                heif_file.stride,
+            )
+        else:
+            raise
 
     # Resize the image to a maximum width and height of 800 pixels
     max_size = (800, 800)
-    img.thumbnail(max_size, Image.ANTIALIAS)
+    img.thumbnail(max_size, Image.LANCZOS)
 
-    # Save the resized image to a BytesIO object
+    # Save the resized image to a BytesIO object in JPEG format
     img_io = BytesIO()
     img.save(img_io, format='JPEG')
     img_io.seek(0)
 
     # Save the image to the default storage
-    image_name = default_storage.save(f'uploads/{image.name}', ContentFile(img_io.read()))
+    image_name = default_storage.save(f'uploads/{image.name}.jpg', ContentFile(img_io.read()))
     image_path = default_storage.path(image_name)
 
     # Predict the face shape
@@ -217,15 +233,21 @@ def save_image_and_predict(image):
 @permission_classes([AllowAny])
 def predict(request):
     if 'image' not in request.FILES:
+        logger.error("No image provided in the request")
         return Response({'status': 'error', 'message': 'No image provided'}, status=status.HTTP_400_BAD_REQUEST)
     
     if 'gender' not in request.data:
+        logger.error("No gender provided in the request")
         return Response({'status': 'error', 'message': 'No gender provided'}, status=status.HTTP_400_BAD_REQUEST)
     
     image = request.FILES['image']
     gender = request.data['gender']
     
-    image_name, predicted_face_shape = save_image_and_predict(image)
+    try:
+        image_name, predicted_face_shape = save_image_and_predict(image)
+    except Exception as e:
+        logger.error(f"Error in save_image_and_predict: {str(e)}")
+        return Response({'status': 'error', 'message': 'Error processing image'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     try:
         face_shape = FaceShape.objects.get(name=predicted_face_shape)
@@ -270,7 +292,11 @@ def predict(request):
             }
         }, status=status.HTTP_200_OK)
     except FaceShape.DoesNotExist:
+        logger.error(f"Face shape '{predicted_face_shape}' not found in the database")
         return Response({'status': 'error', 'message': 'Face shape not found'}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        logger.error(f"Unexpected error: {str(e)}")
+        return Response({'status': 'error', 'message': 'An unexpected error occurred'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
