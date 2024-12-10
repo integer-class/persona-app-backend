@@ -287,15 +287,30 @@ def predict(request):
                 'image_url': default_storage.url(image_name),
                 'face_shape': predicted_face_shape,
                 'recommendations': {
-                    'hair_styles': recommended_hair_styles,
-                    'accessories': recommended_accessories
+                    'hair_styles': [{
+                        **hair_style,
+                        'image': request.build_absolute_uri(hair_style['image']) 
+                        # Tambahkan domain ke path image
+                    } for hair_style in recommended_hair_styles],
+                    'accessories': [{
+                        **accessory,
+                        'image': request.build_absolute_uri(accessory['image'])
+                        # Tambahkan domain ke path image
+                    } for accessory in recommended_accessories]
                 },
                 'other_options': {
-                    'hair_styles': other_hair_styles,
-                    'accessories': other_accessories
+                    'hair_styles': [{
+                        **hair_style,
+                        'image': request.build_absolute_uri(hair_style['image'])
+                    } for hair_style in other_hair_styles],
+                    'accessories': [{
+                        **accessory,
+                        'image': request.build_absolute_uri(accessory['image'])
+                    } for accessory in other_accessories]
                 }
             }
         }, status=status.HTTP_200_OK)
+        
     except FaceShape.DoesNotExist:
         logger.error(f"Face shape '{predicted_face_shape}' not found in the database")
         return Response({'status': 'error', 'message': 'Face shape not found'}, status=status.HTTP_404_NOT_FOUND)
