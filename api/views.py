@@ -197,17 +197,22 @@ def save_image_and_predict(image):
         # Open the image using Pillow
         img = Image.open(image)
     except UnidentifiedImageError:
-        if image.name.lower().endswith('.heic'):
-            heif_file = pyheif.read(image)
-            img = Image.frombytes(
-                heif_file.mode, 
-                heif_file.size, 
-                heif_file.data,
-                "raw",
-                heif_file.mode,
-                heif_file.stride,
-            )
+        if image.name.lower().endswith('.heic') or image.name.lower().endswith('.avif'):
+            try:
+                heif_file = pyheif.read(image)
+                img = Image.frombytes(
+                    heif_file.mode, 
+                    heif_file.size, 
+                    heif_file.data,
+                    "raw",
+                    heif_file.mode,
+                    heif_file.stride,
+                )
+            except Exception as e:
+                logger.error(f"Error reading HEIF/AVIF file: {str(e)}")
+                raise
         else:
+            logger.error(f"Unidentified image format for file: {image.name}")
             raise
 
     # Resize the image to a maximum width and height of 800 pixels
@@ -297,7 +302,7 @@ def predict(request):
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}")
         return Response({'status': 'error', 'message': 'An unexpected error occurred'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+    
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def save_user_selection(request):
