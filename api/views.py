@@ -225,7 +225,7 @@ def save_image_and_predict(image):
     img_io.seek(0)
 
     # Save the image to the default storage
-    image_name = default_storage.save(f'uploads/{image.name}.jpg', ContentFile(img_io.read()))
+    image_name = default_storage.save(f'uploads/{image.name}', ContentFile(img_io.read()))
     image_path = default_storage.path(image_name)
 
     # Predict the face shape
@@ -362,3 +362,16 @@ def logout(request):
         return Response({'status': 'success', 'message': 'Logged out successfully'}, status=status.HTTP_200_OK)
     except Token.DoesNotExist:
         return Response({'status': 'error', 'message': 'Invalid token'}, status=status.HTTP_400_BAD_REQUEST)
+    
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def delete_image(request):
+    image_url = request.data.get('image_url')
+    if image_url:
+        image_name = image_url.split('/')[-1]
+        if default_storage.exists(image_name):
+            default_storage.delete(image_name)
+            return Response({'status': 'success', 'message': 'Image deleted successfully'})
+        else:
+            return Response({'status': 'error', 'message': 'Image not found'}, status=404)
+    return Response({'status': 'error', 'message': 'Image URL not provided'}, status=400)

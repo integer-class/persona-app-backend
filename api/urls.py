@@ -19,6 +19,7 @@ from .views import (
     VerifyEmailView,
     save_user_selection,
     UserSelectionViewSet,
+    delete_image,
 )
 
 router = DefaultRouter()
@@ -45,5 +46,6 @@ urlpatterns = [
     path('password-reset/confirm/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
     path('save-selection/', save_user_selection, name='save_user_selection'),
     path('user-selection/', UserSelectionViewSet.as_view({'get': 'list'}), name='user-selection'),
+    path('delete-image/', delete_image, name='delete_image'),
 ]
 
