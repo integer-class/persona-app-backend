@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
-from .models import FaceShape, HairStyle, Accessory, Recommendation, Feedback, History, UserProfile, UserSelection
+from .models import FaceShape, HairStyle, Accessory, Prediction, Recommendation, Feedback, History, UserProfile, UserSelection
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
@@ -139,13 +139,19 @@ class FeedbackSerializer(serializers.ModelSerializer):
         model = Feedback
         fields = '__all__'
         read_only_fields = ['user']
-        
-class HistorySerializer(serializers.ModelSerializer):
-    class Meta:
-        model = History
-        fields = '__all__'  
-
 class UserSelectionSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserSelection
         fields = '__all__'
+class PredictionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Prediction
+        fields = '__all__'
+class HistorySerializer(serializers.ModelSerializer):
+    prediction = PredictionSerializer()
+    user_selection = UserSelectionSerializer()
+
+    class Meta:
+        model = History
+        fields = '__all__'
+        

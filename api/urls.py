@@ -4,6 +4,7 @@ from .views import (
     FaceShapeViewSet,
     HairStyleViewSet,
     AccessoryViewSet,
+    PredictionViewSet,
     RecommendationsViewSet,
     FeedbackViewSet,
     HistoryViewSet,
@@ -17,9 +18,9 @@ from .views import (
     logout,
     UpdateProfileView,
     VerifyEmailView,
-    save_user_selection,
     UserSelectionViewSet,
     delete_image,
+    save_user_choices,
 )
 
 router = DefaultRouter()
@@ -29,8 +30,7 @@ router.register(r'accessories', AccessoryViewSet)
 router.register(r'recommendations', RecommendationsViewSet)
 router.register(r'feedback', FeedbackViewSet)
 router.register(r'history', HistoryViewSet)
-router.register(r'user-selection', UserSelectionViewSet)
-
+router.register(r'predictions', PredictionViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),
@@ -44,8 +44,7 @@ urlpatterns = [
     path('password-change/', PasswordChangeView.as_view(), name='password-change'),
     path('password-reset/', PasswordResetView.as_view(), name='password_reset'),
     path('password-reset/confirm/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
-    path('save-selection/', save_user_selection, name='save_user_selection'),
-    path('user-selection/', UserSelectionViewSet.as_view({'get': 'list'}), name='user-selection'),
     path('delete-image/', delete_image, name='delete_image'),
+    path('save-record/', save_user_choices, name='save_record'),
 ]
 

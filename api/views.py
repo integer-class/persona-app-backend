@@ -9,11 +9,12 @@ from rest_framework.parsers import MultiPartParser
 from .inference import predict_face_shape
 from django.utils.http import urlsafe_base64_decode
 from django.contrib.auth.tokens import default_token_generator
-from .models import FaceShape, HairStyle, Accessory, Recommendation, Feedback, History, UserProfile, UserSelection
+from .models import FaceShape, HairStyle, Accessory, Prediction, Recommendation, Feedback, History, UserProfile, UserSelection
 from .serializers import (
     FaceShapeSerializer,
     HairStyleSerializer,
     AccessorySerializer,
+    PredictionSerializer,
     RecommendationsSerializer,
     FeedbackSerializer,
     HistorySerializer,
@@ -27,10 +28,11 @@ from .serializers import (
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from django_ratelimit.decorators import ratelimit
+from django.db import transaction
 import logging
 from PIL import Image
 from io import BytesIO
-import pyheif
+import pyheif # type: ignore
 from PIL import UnidentifiedImageError
 
 logger = logging.getLogger(__name__)
@@ -192,12 +194,20 @@ class UserSelectionViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return UserSelection.objects.filter(user=self.request.user)
 
+class PredictionViewSet(viewsets.ModelViewSet):
+    queryset = Prediction.objects.all()
+    serializer_class = PredictionSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_queryset(self):
+        return Prediction.objects.filter(user=self.request.user)
+
 def save_image_and_predict(image):
     try:
         # Open the image using Pillow
         img = Image.open(image)
     except UnidentifiedImageError:
-        if image.name.lower().endswith('.heic') or image.name.lower().endswith('.avif'):
+        if image.name.lower().endswith(('.heic', '.avif')):
             try:
                 heif_file = pyheif.read(image)
                 img = Image.frombytes(
@@ -208,8 +218,11 @@ def save_image_and_predict(image):
                     heif_file.mode,
                     heif_file.stride,
                 )
-            except Exception as e:
+            except pyheif.error.HeifError as e:
                 logger.error(f"Error reading HEIF/AVIF file: {str(e)}")
+                raise
+            except Exception as e:
+                logger.error(f"Unexpected error reading HEIF/AVIF file: {str(e)}")
                 raise
         else:
             logger.error(f"Unidentified image format for file: {image.name}")
@@ -277,25 +290,28 @@ def predict(request):
             accessories.exclude(id__in=recommended_accessories_ids), many=True
         ).data
         
-        user = request.user if request.user.is_authenticated else None
-        if user:
-            History.objects.create(user=user, recommendation=recommendations.first(), image=image_name)
+        prediction = Prediction.objects.create(
+            image=image,
+            face_shape=face_shape,
+            user=request.user if request.user.is_authenticated else None  # Add user if authenticated
+        )
         
         return Response({
             'status': 'success',
             'data': {
+                'prediction_id': prediction.id,
                 'image_url': default_storage.url(image_name),
                 'face_shape': predicted_face_shape,
+                'recommendations_id': recommendations.values_list('id', flat=True),
+                
                 'recommendations': {
                     'hair_styles': [{
                         **hair_style,
                         'image': request.build_absolute_uri(hair_style['image']) 
-                        # Tambahkan domain ke path image
                     } for hair_style in recommended_hair_styles],
                     'accessories': [{
                         **accessory,
                         'image': request.build_absolute_uri(accessory['image'])
-                        # Tambahkan domain ke path image
                     } for accessory in recommended_accessories]
                 },
                 'other_options': {
@@ -317,43 +333,7 @@ def predict(request):
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}")
         return Response({'status': 'error', 'message': 'An unexpected error occurred'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def save_user_selection(request):
-    user = request.user
-    recommendation_id = request.data.get('recommendation_id')
-    selected_hair_style_id = request.data.get('selected_hair_style_id')
-    selected_accessories_ids = request.data.get('selected_accessories_ids', [])
-
-    if isinstance(selected_accessories_ids, str):
-        selected_accessories_ids = selected_accessories_ids.strip('[]').split(',')
-        selected_accessories_ids = [int(id.strip()) for id in selected_accessories_ids]
-    
-    try:
-        recommendation = Recommendation.objects.get(id=recommendation_id)
-        selected_hair_style = HairStyle.objects.get(id=selected_hair_style_id)
-        selected_accessories = Accessory.objects.filter(id__in=selected_accessories_ids)
-
-        user_selection = UserSelection.objects.create(
-            user=user,
-            recommendation=recommendation,
-            selected_hair_style=selected_hair_style
-        )
-        user_selection.selected_accessories.set(selected_accessories)
-        user_selection.save()
-
-        return Response({'status': 'success', 'message': 'User selection saved successfully'}, status=status.HTTP_201_CREATED)
-    except Recommendation.DoesNotExist:
-        logger.error(f"Recommendation with id {recommendation_id} does not exist")
-        return Response({'status': 'error', 'message': 'Invalid recommendation ID provided'}, status=status.HTTP_400_BAD_REQUEST)
-    except HairStyle.DoesNotExist:
-        logger.error(f"HairStyle with id {selected_hair_style_id} does not exist")
-        return Response({'status': 'error', 'message': 'Invalid hair style ID provided'}, status=status.HTTP_400_BAD_REQUEST)
-    except Accessory.DoesNotExist:
-        logger.error(f"Accessory with ids {selected_accessories_ids} do not exist")
-        return Response({'status': 'error', 'message': 'Invalid accessory IDs provided'}, status=status.HTTP_400_BAD_REQUEST)
-
+        
 @api_view(['POST'])
 @ratelimit(key='ip', rate='5/m', method='POST', block=True)
 def logout(request):
@@ -369,9 +349,83 @@ def delete_image(request):
     image_url = request.data.get('image_url')
     if image_url:
         image_name = image_url.split('/')[-1]
-        if default_storage.exists(image_name):
-            default_storage.delete(image_name)
-            return Response({'status': 'success', 'message': 'Image deleted successfully'})
-        else:
+        logger.info(f"Attempting to delete image: {image_url}")
+        
+        # Delete from database
+        try:
+            prediction = Prediction.objects.get(image=f'uploads/{image_name}')
+            prediction.delete()  # This will also delete the file from storage
+            logger.info(f"Prediction and image deleted successfully: {image_name}")
+            return Response({'status': 'success', 'message': 'Image and prediction deleted successfully'})
+        except Prediction.DoesNotExist:
+            logger.error(f"Prediction not found for image: {image_name}")
+            # Still try to delete file if it exists
+            if default_storage.exists(f'uploads/{image_name}'):
+                default_storage.delete(f'uploads/{image_name}')
+                return Response({'status': 'success', 'message': 'Image file deleted successfully'})
             return Response({'status': 'error', 'message': 'Image not found'}, status=404)
+    logger.error("Image URL not provided in the request")
     return Response({'status': 'error', 'message': 'Image URL not provided'}, status=400)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def save_user_choices(request):
+    try:
+        # Get required data
+        user = request.user
+        prediction_id = request.data.get('prediction_id')
+        recommendation_id = request.data.get('recommendation_id')
+        selected_hair_style_id = request.data.get('selected_hair_style_id')
+        selected_accessories_ids = request.data.get('selected_accessories_ids', [])
+
+        # Process accessories ids if string
+        if isinstance(selected_accessories_ids, str):
+            selected_accessories_ids = selected_accessories_ids.strip('[]').split(',')
+            selected_accessories_ids = [int(id.strip()) for id in selected_accessories_ids]
+
+        # Get required objects and validate
+        try:
+            prediction = Prediction.objects.get(id=prediction_id)
+            recommendation = Recommendation.objects.get(id=recommendation_id)
+            selected_hair_style = HairStyle.objects.get(id=selected_hair_style_id)
+            selected_accessories = Accessory.objects.filter(id__in=selected_accessories_ids)
+        except (Prediction.DoesNotExist, Recommendation.DoesNotExist, 
+                HairStyle.DoesNotExist, Accessory.DoesNotExist) as e:
+            logger.error(f"Object lookup error: {str(e)}")
+            return Response({
+                'status': 'error',
+                'message': 'Invalid ID provided'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Use transaction to ensure data consistency
+        with transaction.atomic():
+            # Create user selection
+            user_selection = UserSelection.objects.create(
+                user=user,
+                recommendation=recommendation,
+                selected_hair_style=selected_hair_style
+            )
+            user_selection.selected_accessories.set(selected_accessories)
+
+            # Create history entry
+            history = History.objects.create(
+                prediction=prediction,
+                user=user,
+                user_selection=user_selection
+            )
+
+        return Response({
+            'status': 'success',
+            'message': 'Choices saved successfully',
+            'data': {
+                'history': HistorySerializer(history).data,
+                'user_selection': UserSelectionSerializer(user_selection).data
+            }
+        }, status=status.HTTP_201_CREATED)
+
+    except Exception as e:
+        logger.error(f"Error saving user choices: {str(e)}")
+        return Response({
+            'status': 'error', 
+            'message': 'Error saving choices'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

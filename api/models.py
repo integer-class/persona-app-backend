@@ -91,18 +91,6 @@ class Feedback(TimeStampedModel):
         verbose_name = "Feedback"
         verbose_name_plural = "Feedbacks"
 
-class History(TimeStampedModel):
-    recommendation = models.ForeignKey(Recommendation, on_delete=models.CASCADE, related_name='history')
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='history')
-    image = models.ImageField(upload_to=PathAndRename('uploads/'), blank=True, null=True)
-
-    def __str__(self):
-        return f"History of {self.user.username} - {self.recommendation}"
-
-    class Meta:
-        verbose_name = "History"
-        verbose_name_plural = "Histories"
-        
 class UserSelection(TimeStampedModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='selections')
     recommendation = models.ForeignKey(Recommendation, on_delete=models.CASCADE, related_name='selections')
@@ -115,3 +103,24 @@ class UserSelection(TimeStampedModel):
     class Meta:
         verbose_name = "User Selection"
         verbose_name_plural = "User Selections"
+
+class Prediction(TimeStampedModel):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='predictions', null=True)
+    image = models.ImageField(upload_to=PathAndRename('uploads/'))
+    face_shape = models.ForeignKey(FaceShape, on_delete=models.SET_NULL, null=True, blank=True, related_name='predictions')
+
+    def __str__(self):
+        return f"Prediction - {self.face_shape.name if self.face_shape else 'Unknown'}"
+
+class History(TimeStampedModel):
+    prediction = models.ForeignKey(Prediction, on_delete=models.CASCADE, related_name='history')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='history')
+    user_selection = models.ForeignKey(UserSelection, on_delete=models.CASCADE, related_name='history', null=True, blank=True)
+
+    def __str__(self):
+        return f"History of {self.user.username} - {self.prediction.face_shape.name if self.prediction.face_shape else 'Unknown'}"
+
+    class Meta:
+        verbose_name = "History"
+        verbose_name_plural = "Histories"
+        
