@@ -18,7 +18,6 @@ from .views import (
     logout,
     UpdateProfileView,
     VerifyEmailView,
-    UserSelectionViewSet,
     delete_image,
     save_user_choices,
 )
