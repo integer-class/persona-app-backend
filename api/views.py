@@ -346,26 +346,21 @@ def logout(request):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def delete_image(request):
-    image_url = request.data.get('image_url')
-    if image_url:
-        image_name = image_url.split('/')[-1]
-        logger.info(f"Attempting to delete image: {image_url}")
+    image_id = request.data.get('image_id')
+    if image_id:
+        logger.info(f"Attempting to delete image with ID: {image_id}")
         
         # Delete from database
         try:
-            prediction = Prediction.objects.get(image=f'uploads/{image_name}')
+            prediction = Prediction.objects.get(id=image_id)
             prediction.delete()  # This will also delete the file from storage
-            logger.info(f"Prediction and image deleted successfully: {image_name}")
+            logger.info(f"Prediction and image deleted successfully: {image_id}")
             return Response({'status': 'success', 'message': 'Image and prediction deleted successfully'})
         except Prediction.DoesNotExist:
-            logger.error(f"Prediction not found for image: {image_name}")
-            # Still try to delete file if it exists
-            if default_storage.exists(f'uploads/{image_name}'):
-                default_storage.delete(f'uploads/{image_name}')
-                return Response({'status': 'success', 'message': 'Image file deleted successfully'})
+            logger.error(f"Prediction not found for ID: {image_id}")
             return Response({'status': 'error', 'message': 'Image not found'}, status=404)
-    logger.error("Image URL not provided in the request")
-    return Response({'status': 'error', 'message': 'Image URL not provided'}, status=400)
+    logger.error("Image ID not provided in the request")
+    return Response({'status': 'error', 'message': 'Image ID not provided'}, status=400)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
