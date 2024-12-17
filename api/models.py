@@ -116,7 +116,8 @@ class History(TimeStampedModel):
     prediction = models.ForeignKey(Prediction, on_delete=models.CASCADE, related_name='history')
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='history')
     user_selection = models.ForeignKey(UserSelection, on_delete=models.CASCADE, related_name='history', null=True, blank=True)
-
+    note = models.TextField(blank=True, null=True)
+        
     def __str__(self):
         return f"History of {self.user.username} - {self.prediction.face_shape.name if self.prediction.face_shape else 'Unknown'}"
 

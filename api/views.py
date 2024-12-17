@@ -424,3 +424,36 @@ def save_user_choices(request):
             'status': 'error', 
             'message': 'Error saving choices'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def update_history_note(request, history_id):
+    try:
+        history = History.objects.get(id=history_id, user=request.user)
+        note = request.data.get('note')
+        
+        if note is not None:
+            history.note = note
+            history.save()
+            
+            return Response({
+                'status': 'success',
+                'message': 'Note updated successfully',
+                'data': HistorySerializer(history).data
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response({
+                'status': 'error',
+                'message': 'Note content is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+    except History.DoesNotExist:
+        return Response({
+            'status': 'error',
+            'message': 'History not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({
+            'status': 'error',
+            'message': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
