@@ -228,13 +228,20 @@ def save_image_and_predict(image):
             logger.error(f"Unidentified image format for file: {image.name}")
             raise
 
-    # Resize the image to a maximum width and height of 800 pixels
-    max_size = (800, 800)
-    img.thumbnail(max_size, Image.LANCZOS)
+    # Calculate new dimensions while maintaining aspect ratio
+    max_size = 800
+    ratio = min(max_size/float(img.size[0]), max_size/float(img.size[1]))
+    new_size = tuple([int(dim * ratio) for dim in img.size])
+    
+    # Resize image maintaining aspect ratio
+    img = img.resize(new_size, Image.LANCZOS)
 
-    # Save the resized image to a BytesIO object in JPEG format
+    # Save with reduced quality to decrease file size
     img_io = BytesIO()
-    img.save(img_io, format='JPEG')
+    # Convert to RGB if image is in RGBA mode
+    if img.mode in ('RGBA', 'P'):
+        img = img.convert('RGB')
+    img.save(img_io, format='JPEG', quality=85, optimize=True)
     img_io.seek(0)
 
     # Save the image to the default storage
